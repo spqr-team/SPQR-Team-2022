@@ -1,0 +1,2 @@
+void   initIMU();
+float  readIMU();
