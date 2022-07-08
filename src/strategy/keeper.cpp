@@ -157,13 +157,6 @@ void Keeper_compute(struct data *dataRobot, int *dir, int *vel, int *orient, boo
 
         vectY = keeper_vectY_lines(*dataRobot, false);
 
-        // fix vai più indietro ai lati 
-        if(zoneKeeper == SIDES) {
-            if(vectY < 0) vectY = vectY - 1000;  // prec = 100 
-        }    
-        else { // vai più veloce al centro davanti l'area 
-            maxVel = CENTER_VEL_KEEPER; 
-        }
     }
     
 

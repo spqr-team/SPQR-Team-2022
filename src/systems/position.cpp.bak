@@ -100,8 +100,8 @@ unsigned int computeDistance(int coordX, int coordY, int robotX, int robotY) {
   int deltaX = coordX - robotX;
   int deltaY = coordY - robotY;
 
-  if(deltaX < 0) deltaX *= -1;
-  if(deltaY < 0) deltaY *= -1;
+  if(deltaX < 0) deltaX * -1;
+  if(deltaY < 0) deltaY * -1;
 
   unsigned int distance = (unsigned int) sqrt(deltaX*deltaX  +  deltaY*deltaY); 
 
@@ -165,4 +165,52 @@ bool goToPoint(struct data dataRobot, int pointX, int pointY, int *dir, int *vel
   // arrived 
   if((millis() - time) > 500) return true; 
   else return false; 
+}
+
+
+
+// complementary filter of goal angles for position system 
+int filterAngCAM_blue(int ang) {
+  
+  static int ang_prec = 0; 
+  int angFilter = 0; 
+
+  if(((ang > 180) && (ang_prec < 180))  ||  (((ang < 180) && (ang_prec > 180)))) {
+    if(ang > 180) ang = -(360 - ang);
+    else if(ang_prec > 180) ang_prec = -(360 - ang_prec);
+
+    angFilter = (ang * COEFF_GOAL_POSITION) + (ang_prec * (1 - COEFF_GOAL_POSITION));
+  }
+  else {
+    angFilter = (ang * COEFF_GOAL_POSITION) + (ang_prec * (1 - COEFF_GOAL_POSITION));
+  }
+
+  if(angFilter < 0) angFilter += 360;
+  ang_prec = angFilter;
+
+  return angFilter;
+}
+
+
+
+// complementary filter of goal angles for position system 
+int filterAngCAM_yellow(int ang) {
+  
+  static int ang_prec = 0; 
+  int angFilter = 0; 
+
+  if(((ang > 180) && (ang_prec < 180))  ||  (((ang < 180) && (ang_prec > 180)))) {
+    if(ang > 180) ang = -(360 - ang);
+    else if(ang_prec > 180) ang_prec = -(360 - ang_prec);
+
+    angFilter = (ang * COEFF_GOAL_POSITION) + (ang_prec * (1 - COEFF_GOAL_POSITION));
+  }
+  else {
+    angFilter = (ang * COEFF_GOAL_POSITION) + (ang_prec * (1 - COEFF_GOAL_POSITION));
+  }
+
+  if(angFilter < 0) angFilter += 360;
+  ang_prec = angFilter;
+
+  return angFilter;
 }
