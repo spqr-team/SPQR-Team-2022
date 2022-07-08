@@ -1,0 +1,180 @@
+# color trackingPorte di ROLLER
+# con cam dritta a 0° verso la bocca del robot
+
+import sensor, image, time, math, pyb
+from pyb import UART
+
+#init seriale UART parity: none, stop: 1     pins UART 3  P4 - P5
+uart = UART(3,74880)
+
+#init LED (off)
+red = pyb.LED(1)
+green = pyb.LED(2)
+blue = pyb.LED(3)
+
+# LED off
+red.off()
+green.off()
+blue.off()
+
+
+# IMPOSTAZIONI MIE ROBOT TRE MOTORI
+#sensor.reset()
+#sensor.set_pixformat(sensor.RGB565)
+#sensor.set_framesize(sensor.QVGA)
+#sensor.set_contrast(+3)
+#sensor.set_saturation(+3)
+#sensor.set_brightness(+3)
+#sensor.set_quality(0)
+#sensor.set_auto_exposure(False, 8000)
+#sensor.set_auto_gain(True) # modificatooo
+#sensor.set_hmirror(True)
+#sensor.skip_frames(time = 300)
+
+#IMPOSTAZIONI EMA ROBOT QUATTRO MOTORI con transpose
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QVGA)
+sensor.set_contrast(+3)
+sensor.set_saturation(+3)
+sensor.set_brightness(+3)
+sensor.set_quality(0)
+sensor.set_auto_whitebal(False)
+#sensor.set_auto_gain(False)
+sensor.set_auto_exposure(False, 8000)
+sensor.set_vflip(False)
+sensor.set_hmirror(True)
+#sensor.set_transpose(False)
+sensor.skip_frames(time = 2000)
+clock = time.clock()
+
+
+
+#soglie colori blu e giallo
+soglie_colori = [(48, 65, -3, 40, -80, -31),    # blu lab
+                      (75, 100, 0, -30, 50, 90)]     # giallo lab
+
+# soglie casa giorno blu: (48, 78, -20, 47, -80, -34)
+#soglie casa notte blu: (42, 58, -22, 7, -27, 0)
+
+# soglie giallo lab: (75, 100, 0, -30, 50, 86)
+# soglie blu lab: (49, 65, 0, 41, -78, -37)
+
+
+#coordinate centro immagine (specchio) QVGA (180, 120)
+Cx = 138
+Cy = 93
+
+# flag blob yellow and blue trovati
+yellow_found = False
+blue_found = False
+
+# fps
+clock = time.clock()
+
+
+#From Arduino Documentation at: https://www.arduino.cc/reference/en/language/functions/math/map/
+def val_map(x, in_min, in_max, out_min, out_max):
+    x = int(x)
+    in_min = int(in_min)
+    in_max = int(in_max)
+    out_min = int(out_min)
+    out_max = int(out_max)
+    return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+
+# scaling area values
+def remapArea(value):
+    area = value
+    if(area != 0):
+        area = area / 30
+    if (area > 500): area = 500
+    return int(area)
+
+
+while(True):
+
+    # fps
+    clock.tick()
+
+    # led blue off
+    blue.off()
+
+    # liste di tuple blob
+    blob_blue = [(0,0,0)]
+    blob_yellow = [(0,0,0)]
+
+    # cerco blob nell'immagine
+    img = sensor.snapshot()
+    img.draw_cross(Cx,Cy)
+    for blob in img.find_blobs(soglie_colori, pixels_threshold=100, area_threshold=200, merge = True):
+        img.draw_rectangle(blob.rect())
+        img.draw_cross(blob.cx(), blob.cy())
+        img.draw_line(Cx, Cy, blob.cx(), blob.cy())
+
+    # aggiungo blob yellow e blue alle liste 1 = blue, 2 = yellow
+        if (blob.code() == 1):
+            blob_blue = blob_blue +  [ (blob.area(),blob.cx(),blob.cy()) ]
+            blue_found = True
+
+        if (blob.code() == 2):
+            blob_yellow = blob_yellow +  [ (blob.area(),blob.cx(),blob.cy()) ]
+            yellow_found = True
+
+    # ordino le liste di blob: quello con area più grande è il primo della lista
+    blob_yellow.sort(reverse = True)
+    blob_blue.sort(reverse = True)
+
+    # yellow
+    # calcolo angolo del blob più grande relativo al centro dello specchio. (0° - 360°)
+    # se ho trovato almeno un blob yellow:
+    if(yellow_found == True):
+        # area e coordinate del centro del blob
+        areaY = blob_yellow[0][0]
+        areaY = remapArea(areaY)
+        cx = blob_yellow[0][1]
+        cy = blob_yellow[0][2]
+        ang = int(90+(math.atan2(cy-Cy, cx-Cx) * 180 / math.pi))
+        if(ang < 0): ang = ang + 360
+
+        #ang = (ang + 90)  %  360   # correzione angolo CAM di ema
+
+        data = "{}{}{}{}{}".format("Y", str(ang), "-", str(areaY), "y")
+    # il numero 999 indica che non ho trovato nessun blob
+    else:
+        data = "{}{}{}{}{}".format("Y", "999", "-", "0", "y")
+
+    # trasmetto dati in seriale e test su terminale
+    uart.write(data)
+    print(data)
+
+
+    # blue
+    # calcolo angolo del blob più grande relativo al centro dello specchio. (0° - 360°)
+    # se ho trovato almeno un blob blue
+    if(blue_found == True):
+        areaB = blob_blue[0][0]
+        areaB = remapArea(areaB)
+        cx = blob_blue[0][1]
+        cy = blob_blue[0][2]
+        ang = int(90+(math.atan2(cy-Cy, cx-Cx) * 180 / math.pi))
+        if(ang < 0): ang = ang + 360
+
+        #ang = (ang + 90)  %  360   # correzione angolo CAM di ema
+
+        data = "{}{}{}{}{}".format("B", str(ang), "-", str(areaB), "b")
+    # il numero 999 indica che non ho trovato nessun blob
+    else:
+        data = "{}{}{}{}{}".format("B", "999", "-", "0", "b")
+
+
+    # trasmetto dati in seriale e test su terminale
+    uart.write(data)
+    print(data)
+
+
+    # reset flag dei blob trovati
+    yellow_found = False
+    blue_found = False
+
+    # fps
+    #print(clock.fps())
